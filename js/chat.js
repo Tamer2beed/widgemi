@@ -1,0 +1,124 @@
+const memberColors = ['#1f2937','#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2','#be123c'];
+
+const ME_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%239333ea'/%3E%3Ccircle cx='50' cy='38' r='18' fill='white'/%3E%3Cellipse cx='50' cy='90' rx='32' ry='28' fill='white'/%3E%3C/svg%3E";
+const ME_USER = {
+    id: 'me', name: 'أنا', avatar: ME_AVATAR,
+    status: localStorage.getItem('myStatus') || 'متواجد الآن',
+    statusColor: localStorage.getItem('myStatusColor') || '#22c55e',
+    isOwner: false, color: '#9333ea'
+};
+
+let mockUsersList = [
+    ME_USER,
+    { id:1, name:"عباصم", avatar:"https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150", status:"لدار للمرة يسكنها الا اللتي كان قبل لموت بانيها", isOwner:true, color:memberColors[0] },
+    { id:2, name:"o0 ما مرتاح 0o", avatar:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150", status:"مرحب بالجميع", isOwner:false, color:memberColors[1] },
+    { id:3, name:"BeNt H!tLeR", avatar:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150", status:"ابتسم للحياة", isOwner:true, color:memberColors[2] },
+    { id:4, name:"RoSe PaIris", avatar:"https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150", status:"خلي بينك وبين الناس مسافه لأن فجأه بع...", isOwner:true, color:memberColors[3] },
+    { id:5, name:"Ace", avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150", status:"بعينيها .. تقلب موازين الثبات .", isOwner:true, color:memberColors[4] }
+];
+
+const newNamesPool = ["المهندس أحمد","نجمة طرابلس","الصقر الليبي","بنغازي العز","صقر الجنوب","ريما","عابر سبيل"];
+const newAvatarsPool = ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150","https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150","https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150","https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"];
+const newStatusesPool = ["منورين يا غوالي","يسعد مساكم جميعاً","مرحبتين بالجميع","برنس في حالي","بأخلاقي أرتقي"];
+const mockPhrases = ["السلام عليكم ورحمة الله، مساكم الله بالخير يا جماعة منورين","مرحبتين بيك، كيف حالكم وحال أهلنا في ليبيا؟","أهلاً وسهلاً بالجميع، يسعدنا تواجدكم معنا في الروم اليوم","روم متميز كالعادة، ترحيب حار بكل الحضور منورين جداً","منورين يا غوالي، إن شاء الله ديمة ملتمين على الخير والود","يا مرحب بكل الأعضاء الجدد، نورتوا الجلسة الليبية","شن الجو اليوم يا شباب؟ إن شاء الله الكل بخير ومبسوطين","منور يا عباصم الروم منور بأهله وناسه دايماً"];
+
+function sanitize(str) { return String(str).replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function getUserSortPriority(userId, originalIndex) {
+    try {
+        if (typeof speakerState !== 'undefined' && speakerState.user && speakerState.user.id === userId) return -1;
+        if (typeof micQueue !== 'undefined') {
+            const qIdx = micQueue.findIndex(q => q.id === userId);
+            if (qIdx > -1) return qIdx;
+        }
+    } catch (err) { console.error('خطأ في حساب ترتيب الطابور:', err); }
+    return 1000 + originalIndex;
+}
+
+function renderOnlineUsers() {
+    const container = document.getElementById("onlineUsersList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const sortedUsers = mockUsersList
+        .map((user, idx) => ({ user, priority: getUserSortPriority(user.id, idx) }))
+        .sort((a, b) => a.priority - b.priority)
+        .map(entry => entry.user);
+
+    sortedUsers.forEach(user => {
+        const micBadge = (typeof getUserMicBadgeHtml === 'function') ? getUserMicBadgeHtml(user.id) : '';
+        const isMe = user.id === 'me';
+        const dotColor = isMe ? (user.statusColor || '#22c55e') : '#22c55e';
+        const item = document.createElement('div');
+        const ignored = (!isMe && typeof isUserIgnored === 'function' && isUserIgnored(user.id));
+        item.className = `flex items-center justify-between p-2 rounded-xl border shadow-sm user-card-item ${!isMe ? 'cursor-pointer' : ''} ${isMe ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300' : 'bg-gray-50 border-gray-100'} ${ignored ? 'opacity-50' : ''}`;
+        item.dataset.userId = user.id;
+        const roleStyle = (isMe && user.hasAccount && typeof getRoleNameStyle === 'function') ? getRoleNameStyle(user.role) : '';
+        const nameStyle = roleStyle ? ` style="${roleStyle}"` : '';
+        const glowClass = (isMe && user.hasAccount && user.role === 'super_master') ? ' super-master-glow' : '';
+        const nameLabel = isMe ? `<span class="font-bold${glowClass}"${nameStyle}>${sanitize(user.name)}</span> <span class="text-purple-500 text-[9px] font-normal">(أنت)</span>` : `<span${nameStyle}>${sanitize(user.name)}</span>`;
+        item.innerHTML = `<div class="flex items-center gap-3"><div class="relative"><img src="${sanitize(user.avatar)}" class="w-11 h-11 rounded-xl object-cover border-2 ${isMe ? 'border-purple-400' : 'border-amber-400'}"><div class="absolute bottom-[-2px] left-[-2px] w-3 h-3 rounded-full border-2 border-white" style="background:${sanitize(dotColor)};"></div></div><div class="flex flex-col text-left max-w-[140px]"><span class="font-bold text-gray-800 text-xs truncate">${nameLabel}</span><span class="text-[10px] text-gray-400 truncate">${sanitize(user.status)}</span></div></div><div class="flex items-center gap-1.5">${micBadge}${user.isOwner?'<span class="text-amber-500 text-xs bg-amber-50 p-1 rounded-md"><i class="fa-solid fa-crown"></i></span>':''}</div>`;
+        container.appendChild(item);
+    });
+}
+
+function sendMockMessage(user) {
+    if (typeof isUserIgnored === 'function' && isUserIgnored(user.id)) return;
+    const msgList = document.getElementById('messagesList');
+    const chatCont = document.getElementById('chatContainer');
+    if (!msgList || !chatCont) return;
+    const phrase = mockPhrases[Math.floor(Math.random() * mockPhrases.length)];
+    const time = new Date().toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
+    const div = document.createElement('div');
+    div.className = "flex items-start max-w-[85%] self-start gap-2";
+    div.innerHTML = `<div class="w-9 h-9 rounded-full bg-purple-500 overflow-hidden shadow-md border-2 border-white shrink-0"><img src="${sanitize(user.avatar)}" class="w-full h-full object-cover"></div><div class="bg-white rounded-2xl shadow-sm border border-purple-100 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs">${sanitize(user.name)}</span><span class="text-[9px] text-gray-400">${sanitize(time)}</span></div><p class="chat-msg-text leading-relaxed break-words" style="color:${sanitize(user.color)};">${sanitize(phrase)}</p></div>`;
+    msgList.appendChild(div);
+    applyUserInterfaceSettings();
+    chatCont.scrollTop = chatCont.scrollHeight;
+}
+
+function simulateUserJoin() {
+    if (mockUsersList.length >= 9) return;
+    const name = newNamesPool[Math.floor(Math.random() * newNamesPool.length)];
+    if (mockUsersList.some(u => u.name === name)) return;
+    const newUser = { id:Date.now(), name, avatar:newAvatarsPool[Math.floor(Math.random()*newAvatarsPool.length)], status:newStatusesPool[Math.floor(Math.random()*newStatusesPool.length)], isOwner:false, color:memberColors[Math.floor(Math.random()*memberColors.length)] };
+    mockUsersList.push(newUser);
+    if (typeof recordLogin === 'function') recordLogin(newUser);
+    renderOnlineUsers();
+    setTimeout(() => sendMockMessage(newUser), 1000);
+}
+
+function simulateUserLeave() {
+    const normal = mockUsersList.filter(u => !u.isOwner && u.id !== 'me');
+    if (mockUsersList.length <= 3 || !normal.length) return;
+    const target = normal[Math.floor(Math.random() * normal.length)];
+    mockUsersList = mockUsersList.filter(u => u.id !== target.id);
+
+    try {
+        if (typeof speakerState !== 'undefined' && speakerState.user && speakerState.user.id === target.id && typeof releaseSpeaker === 'function') {
+            releaseSpeaker();
+        } else if (typeof micQueue !== 'undefined') {
+            const idx = micQueue.findIndex(q => q.id === target.id);
+            if (idx > -1) micQueue.splice(idx, 1);
+        }
+    } catch (err) { console.error('تنظيف حالة السبيكر عند المغادرة فشل:', err); }
+
+    if (typeof recordLogout === 'function') recordLogout(target.id);
+    renderOnlineUsers();
+}
+
+function startSimulation() {
+    renderOnlineUsers();
+    (function loop() {
+        setTimeout(() => {
+            const bots = mockUsersList.filter(u => u.id !== 'me');
+            if (bots.length > 0) {
+                const u = bots[Math.floor(Math.random() * bots.length)];
+                sendMockMessage(u);
+            }
+            loop();
+        }, 6000);
+    })();
+    setInterval(simulateUserJoin, 15000);
+    setInterval(simulateUserLeave, 25000);
+}
