@@ -69,12 +69,19 @@ function sendMockMessage(user) {
     if (!msgList || !chatCont) return;
     const phrase = mockPhrases[Math.floor(Math.random() * mockPhrases.length)];
     const time = new Date().toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
+    const msgId = 'msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const safePhrase = sanitize(phrase);
+    const bodyHtml = (typeof linkifyMentions === 'function') ? linkifyMentions(safePhrase, msgId) : safePhrase;
     const div = document.createElement('div');
+    div.id = msgId;
     div.className = "flex items-start max-w-[85%] self-start gap-2";
-    div.innerHTML = `<div class="w-9 h-9 rounded-full bg-purple-500 overflow-hidden shadow-md border-2 border-white shrink-0"><img src="${sanitize(user.avatar)}" class="w-full h-full object-cover"></div><div class="bg-white rounded-2xl shadow-sm border border-purple-100 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs">${sanitize(user.name)}</span><span class="text-[9px] text-gray-400">${sanitize(time)}</span></div><p class="chat-msg-text leading-relaxed break-words" style="color:${sanitize(user.color)};">${sanitize(phrase)}</p></div>`;
+    div.innerHTML = `<div class="message-user-trigger w-9 h-9 rounded-xl bg-purple-500 overflow-hidden shadow-md border-2 border-white shrink-0 cursor-pointer" data-user-id="${user.id}"><img src="${sanitize(user.avatar)}" class="w-full h-full object-cover"></div><div class="bg-white rounded-2xl shadow-sm border border-purple-100 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs message-user-trigger cursor-pointer" data-user-id="${user.id}">${sanitize(user.name)}</span><span class="text-[9px] text-gray-400">${sanitize(time)}</span></div><p class="chat-msg-text leading-relaxed break-words" style="color:${sanitize(user.color)};">${bodyHtml}</p></div>`;
+
+    const wasNearBottom = (chatCont.scrollHeight - chatCont.scrollTop - chatCont.clientHeight) < 150;
     msgList.appendChild(div);
     applyUserInterfaceSettings();
-    chatCont.scrollTop = chatCont.scrollHeight;
+    if (wasNearBottom) { chatCont.scrollTop = chatCont.scrollHeight; }
+    if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility();
 }
 
 function simulateUserJoin() {

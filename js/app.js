@@ -29,12 +29,21 @@ function isSingleEmoji(text) {
     return /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)$/u.test(trimmed);
 }
 
-function formatMessageText(text) {
+function formatMessageText(text, msgId) {
     const trimmed = text.trim();
     if (isSingleEmoji(trimmed)) {
         return `<span class="text-4xl leading-none inline-block">${sanitizeText(trimmed)}</span>`;
     }
-    return sanitizeText(text);
+    const escaped = sanitizeText(text);
+    return (typeof linkifyMentions === 'function') ? linkifyMentions(escaped, msgId) : escaped;
+}
+
+function checkScrollToBottomVisibility() {
+    const cc = document.getElementById('chatContainer');
+    const btn = document.getElementById('scrollToBottomBtn');
+    if (!cc || !btn) return;
+    const distanceFromBottom = cc.scrollHeight - cc.scrollTop - cc.clientHeight;
+    btn.classList.toggle('hidden', distanceFromBottom < 150);
 }
 
 function applyChatTheme(theme) {
@@ -79,6 +88,7 @@ async function initEventHandlers() {
         applyUserInterfaceSettings();
         initSidebarTouchEvents();
         applyChatTheme(localStorage.getItem('chatTheme') || 'dots');
+        document.getElementById('chatContainer')?.addEventListener('scroll', () => { if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility(); });
         if (typeof initLoginLogs === 'function') initLoginLogs();
         if (typeof initAdminAccounts === 'function') await initAdminAccounts();
         if (typeof initLoginScreen === 'function') initLoginScreen();
@@ -109,8 +119,45 @@ async function initEventHandlers() {
 
                 if (target.closest('#onlineUsersToggleBtn')) { toggleOnlinePanel(); return; }
 
+                const msgUserTrigger = target.closest('.message-user-trigger');
+                if (msgUserTrigger && msgUserTrigger.dataset.userId) {
+                    const msgEl = msgUserTrigger.closest('[id^="msg_"]');
+                    const msgIdForCtx = msgEl ? msgEl.id : null;
+                    if (typeof openMemberContextMenu === 'function') openMemberContextMenu(msgUserTrigger.dataset.userId, msgIdForCtx, msgUserTrigger);
+                    return;
+                }
+
+                if (target.closest('#closeMemberContextBtn')) { closeMemberContextMenu(); return; }
+                if (target.id === 'memberContextModal') { closeMemberContextMenu(); return; }
+                if (target.closest('#memberContextMentionBtn')) { mentionTargetInInput(); return; }
+                if (target.closest('#memberContextClearMsgBtn')) { clearMessageForMe(); return; }
+                if (target.closest('#memberContextClearMsgAllBtn')) { clearMessageForEveryone(); return; }
+                if (target.closest('#memberContextAdminEntryBtn')) { openAdminSubPanel(); return; }
+                if (target.closest('#memberContextAdminBackBtn')) { backToMemberMainPanel(); return; }
+                if (target.closest('#memberContextKickMicBtn')) { adminKickFromMicTarget(); return; }
+                if (target.closest('#memberContextExtendMicBtn')) { adminExtendMicTarget(); return; }
+                if (target.closest('#memberContextOpenMicBtn')) { adminGrantOpenMicTarget(); return; }
+                if (target.closest('#memberContextClearQueueBtn')) { adminClearQueueExceptTarget(); return; }
+
+                const mentionTagEl = target.closest('.mention-tag');
+                if (mentionTagEl) {
+                    const targetMsgId = mentionTagEl.dataset.targetMsg;
+                    const targetMsgEl = targetMsgId ? document.getElementById(targetMsgId) : null;
+                    if (targetMsgEl) {
+                        targetMsgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMsgEl.classList.add('mention-highlight-flash');
+                        setTimeout(() => targetMsgEl.classList.remove('mention-highlight-flash'), 1500);
+                    }
+                    return;
+                }
+                if (target.closest('#scrollToBottomBtn')) {
+                    const cc2 = document.getElementById('chatContainer');
+                    if (cc2) cc2.scrollTo({ top: cc2.scrollHeight, behavior: 'smooth' });
+                    return;
+                }
+
                 const userCard = target.closest('.user-card-item');
-                if (userCard && userCard.dataset.userId) { openMemberContextMenu(userCard.dataset.userId); return; }
+                if (userCard && userCard.dataset.userId) { openMemberContextMenu(userCard.dataset.userId, null, userCard); return; }
 
                 if (target.closest('#closeMemberContextBtn')) { document.getElementById('memberContextModal')?.classList.add('hidden'); return; }
                 if (target.id === 'memberContextModal') { document.getElementById('memberContextModal').classList.add('hidden'); return; }
@@ -396,15 +443,19 @@ async function initEventHandlers() {
             const text = chatInput.value.trim();
             if (!text) return;
             const now = new Date().toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
-            const formatted = formatMessageText(text);
+            const msgId = 'msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            const formatted = formatMessageText(text, msgId);
+            const myName = (typeof ME_USER !== 'undefined') ? ME_USER.name : 'أنا';
             const div = document.createElement('div');
+            div.id = msgId;
             div.className = "flex items-start max-w-[85%] self-start gap-2";
-            div.innerHTML = `<div class="w-9 h-9 rounded-full bg-purple-500 flex items-center justify-center text-white shadow-md border-2 border-white shrink-0"><i class="fa-solid fa-user text-sm"></i></div><div class="bg-purple-100 rounded-2xl shadow-sm border border-purple-200 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs">أنا</span><span class="text-[9px] text-purple-400">${sanitizeText(now)}</span></div><div class="chat-msg-text leading-relaxed break-words" style="color:${sanitizeText(globalFontColor)};">${formatted}</div></div>`;
+            div.innerHTML = `<div class="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center text-white shadow-md border-2 border-white shrink-0"><i class="fa-solid fa-user text-sm"></i></div><div class="bg-purple-100 rounded-2xl shadow-sm border border-purple-200 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs mentionable-name" data-name="${sanitizeText(myName)}">${sanitizeText(myName)}</span><span class="text-[9px] text-purple-400">${sanitizeText(now)}</span></div><div class="chat-msg-text leading-relaxed break-words" style="color:${sanitizeText(globalFontColor)};">${formatted}</div></div>`;
             document.getElementById('messagesList')?.appendChild(div);
             chatInput.value = '';
             applyUserInterfaceSettings();
             const cc = document.getElementById('chatContainer');
             if (cc) cc.scrollTop = cc.scrollHeight;
+            if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility();
         }
         sendBtn?.addEventListener('click', sendMessage);
         chatInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });

@@ -2,6 +2,10 @@
     <div class="flex items-center gap-1 shrink-0">
         <button id="menuBtn" class="text-white text-xl p-2 cursor-pointer hover:bg-black/10 rounded-full"><i class="fa-solid fa-bars"></i></button>
         <button id="onlineUsersToggleBtn" class="text-white text-xl p-2 cursor-pointer hover:bg-black/10 rounded-full"><i class="fa-solid fa-users"></i></button>
+        <button id="pmToggleBtn" class="relative text-white text-xl p-2 cursor-pointer hover:bg-black/10 rounded-full">
+            <i class="fa-solid fa-envelope"></i>
+            <span id="pmUnreadBadge" class="hidden absolute top-0 left-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center border border-purple-600">0</span>
+        </button>
     </div>
     <span class="font-bold text-base tracking-wide truncate px-1">الجلسة الليبية</span>
     <div id="speakerWidget" class="relative cursor-pointer select-none shrink-0">

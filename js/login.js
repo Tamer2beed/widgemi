@@ -1,4 +1,4 @@
-/* login.js — تسجيل الدخول: مطابقة الاسم بدون حساسية لحالة الأحرف، مع عرض الاسم كما كُتب بالضبط. */
+/* login.js — تسجيل الدخول: مطابقة الاسم بدون حساسية لحالة الأحرف، دخول تلقائي آمن (تشفير فقط، بدون نص صريح). */
 
 const AVATAR_PLACEHOLDER_COLORS = ['#9333ea','#2563eb','#16a34a','#dc2626','#ea580c','#0891b2','#db2777','#4f46e5','#65a30d','#0d9488'];
 function buildPlaceholderAvatar(color) {
@@ -14,7 +14,7 @@ function renderAvatarGrid() {
     const grid = document.getElementById('avatarGrid');
     if (!grid) return;
     grid.innerHTML = AVATAR_OPTIONS.map((src) => `
-        <button class="avatar-option-btn rounded-full overflow-hidden border-2 w-14 h-14 ${src === selectedLoginAvatar ? 'border-purple-500' : 'border-transparent'}" data-avatar-src="${src}">
+        <button class="avatar-option-btn rounded-2xl overflow-hidden border-2 w-14 h-14 ${src === selectedLoginAvatar ? 'border-purple-500' : 'border-transparent'}" data-avatar-src="${src}">
             <img src="${src}" class="w-full h-full object-cover">
         </button>
     `).join('');
@@ -64,13 +64,66 @@ function switchLoginTab(tab) {
     }
 }
 
+/* ---------- حفظ بيانات الدخول بأمان: يُخزَّن التجزئة (hash) فقط، لا كلمة المرور الصريحة أبداً ---------- */
+function saveLoginCredentials(name, roomHash, nameHash) {
+    try {
+        const remember = document.getElementById('rememberLoginCheckbox')?.checked;
+        if (!remember) { localStorage.removeItem('savedLoginData'); return; }
+        localStorage.setItem('savedLoginData', JSON.stringify({
+            tab: currentLoginTab, name, avatar: selectedLoginAvatar,
+            roomHash: roomHash || null, nameHash: nameHash || null
+        }));
+    } catch (e) {}
+}
+
+function clearSavedLoginCredentials() { try { localStorage.removeItem('savedLoginData'); } catch (e) {} }
+
+async function tryAutoLogin() {
+    let saved;
+    try { const s = localStorage.getItem('savedLoginData'); if (!s) return false; saved = JSON.parse(s); } catch (e) { return false; }
+    if (!saved || !saved.name) return false;
+
+    switchLoginTab(saved.tab || 'guest');
+    const ui = document.getElementById('loginUsernameInput');
+    if (ui) ui.value = saved.name;
+    if (saved.avatar) selectLoginAvatar(saved.avatar);
+    updateRegisteredPasswordFields();
+
+    if (saved.tab === 'guest') {
+        if (saved.name.toLowerCase() === 'master') return false;
+        if (typeof findAccountByName === 'function' && findAccountByName(saved.name)) return false;
+        finishLogin(saved.name, 'member', false, null, false, true);
+        return true;
+    }
+
+    if (typeof adminAccounts === 'undefined' || typeof findAccountByName !== 'function') return false;
+    const account = findAccountByName(saved.name);
+    if (!account || account.mustChangePassword) return false;
+
+    if (saved.tab === 'member' && account.role !== 'super_master' && saved.roomHash) {
+        if (saved.roomHash === account.passwordHash) {
+            finishLogin(saved.name, account.role, account.role !== 'member', account.id, true, true);
+            return true;
+        }
+    }
+    if (saved.tab === 'registered' && saved.name.toLowerCase() === 'master' && account.role === 'super_master' && saved.roomHash && saved.nameHash) {
+        if (saved.roomHash === account.roomPasswordHash && saved.nameHash === account.namePasswordHash) {
+            finishLogin(saved.name, account.role, true, account.id, true, true);
+            return true;
+        }
+    }
+    clearSavedLoginCredentials();
+    return false;
+}
+
 async function attemptLogin() {
     const name = document.getElementById('loginUsernameInput')?.value.trim();
     if (!name) { if (typeof showNotification === 'function') showNotification('يرجى إدخال اسم المستخدم', 'leave'); return; }
 
     if (currentLoginTab === 'guest') {
         if (name.toLowerCase() === 'master') { if (typeof showNotification === 'function') showNotification('⛔ هذا الاسم محجوز للنظام', 'leave'); return; }
-        if (typeof findAccountByName === 'function' && findAccountByName(name)) { if (typeof showNotification === 'function') showNotification('⛔ هذا الاسم محجوز لعضو مسجّل — استخدم تبويب عضو أو مسجل', 'leave'); return; }
+        if (typeof findAccountByName === 'function' && findAccountByName(name)) { if (typeof showNotification === 'function') showNotification('⛔ هذا الاسم محجوز لعضو مسجّل — استخدم تبويب عضو أو عضو مميز', 'leave'); return; }
+        saveLoginCredentials(name, null, null);
         finishLogin(name, 'member', false, null, false);
         return;
     }
@@ -84,10 +137,11 @@ async function attemptLogin() {
     if (currentLoginTab === 'member') {
         const pw = document.getElementById('loginRoomPasswordInput')?.value.trim();
         if (!pw) { if (typeof showNotification === 'function') showNotification('يرجى إدخال كلمة المرور', 'leave'); return; }
-        if (!account || account.role === 'super_master') { if (typeof showNotification === 'function') showNotification('اسم المستخدم غير موجود — إذا كان "master" استخدم تبويب مسجل', 'leave'); return; }
+        if (!account || account.role === 'super_master') { if (typeof showNotification === 'function') showNotification('اسم المستخدم غير موجود — إذا كان "master" استخدم تبويب عضو مميز', 'leave'); return; }
         const hash = await hashPassword(pw);
         if (hash !== account.passwordHash) { if (typeof showNotification === 'function') showNotification('كلمة المرور غير صحيحة', 'leave'); return; }
         if (account.mustChangePassword) { openForcedSingleChange(account, name); return; }
+        saveLoginCredentials(name, hash, null);
         finishLogin(name, account.role, account.role !== 'member', account.id, true);
         return;
     }
@@ -110,11 +164,11 @@ async function attemptLogin() {
                 document.getElementById('forcedPasswordChangeModal')?.classList.remove('hidden');
                 return;
             }
+            saveLoginCredentials(name, roomHash, nameHash);
             finishLogin(name, account.role, true, account.id, true);
             return;
         }
-
-        if (typeof showNotification === 'function') showNotification('تبويب "مسجل" مخصص فقط للاسم المحجوز master — استخدم تبويب "عضو" لبقية الحسابات', 'leave');
+        if (typeof showNotification === 'function') showNotification('تبويب "عضو مميز" مخصص فقط للاسم المحجوز master — استخدم تبويب "عضو" لبقية الحسابات', 'leave');
         return;
     }
 }
@@ -132,11 +186,13 @@ async function submitForcedSinglePasswordChange() {
     if (!newPw) { if (typeof showNotification === 'function') showNotification('يرجى إدخال كلمة مرور جديدة', 'leave'); return; }
     const account = adminAccounts.find(a => a.id === loggedInAccountId);
     if (!account) return;
-    account.passwordHash = await hashPassword(newPw);
+    const hash = await hashPassword(newPw);
+    account.passwordHash = hash;
     account.mustChangePassword = false;
     saveAdminAccounts();
     document.getElementById('forcedSinglePasswordChangeModal')?.classList.add('hidden');
     const displayName = window.__pendingLoginDisplayName || account.name;
+    saveLoginCredentials(displayName, hash, null);
     finishLogin(displayName, account.role, account.role !== 'member', account.id, true);
     if (typeof showNotification === 'function') showNotification('✅ تم تحديث كلمة المرور بنجاح', 'join');
 }
@@ -148,43 +204,20 @@ async function submitForcedPasswordChange() {
     if (newNamePw === newRoomPw) { if (typeof showNotification === 'function') showNotification('يجب أن تختلف كلمتا المرور عن بعضهما', 'leave'); return; }
     const account = adminAccounts.find(a => a.id === loggedInAccountId);
     if (!account) return;
-    account.namePasswordHash = await hashPassword(newNamePw);
-    account.roomPasswordHash = await hashPassword(newRoomPw);
+    const nameHash = await hashPassword(newNamePw);
+    const roomHash = await hashPassword(newRoomPw);
+    account.namePasswordHash = nameHash;
+    account.roomPasswordHash = roomHash;
     account.mustChangePassword = false;
     saveAdminAccounts();
     document.getElementById('forcedPasswordChangeModal')?.classList.add('hidden');
     const displayName = window.__pendingLoginDisplayName || account.name;
+    saveLoginCredentials(displayName, roomHash, nameHash);
     finishLogin(displayName, account.role, true, account.id, true);
     if (typeof showNotification === 'function') showNotification('✅ تم تحديث كلمتي المرور بنجاح', 'join');
 }
 
-function saveOrClearLoginData(name) {
-    try {
-        const remember = document.getElementById('rememberLoginCheckbox')?.checked;
-        if (remember) {
-            localStorage.setItem('savedLoginData', JSON.stringify({ tab: currentLoginTab, name, avatar: selectedLoginAvatar }));
-        } else {
-            localStorage.removeItem('savedLoginData');
-        }
-    } catch (e) {}
-}
-
-function loadSavedLoginData() {
-    try {
-        const s = localStorage.getItem('savedLoginData');
-        if (!s) return;
-        const data = JSON.parse(s);
-        if (data.tab) switchLoginTab(data.tab);
-        if (data.name) { const ui = document.getElementById('loginUsernameInput'); if (ui) ui.value = data.name; }
-        if (data.avatar) selectLoginAvatar(data.avatar);
-        const cb = document.getElementById('rememberLoginCheckbox');
-        if (cb) cb.checked = true;
-        updateRegisteredPasswordFields();
-    } catch (e) {}
-}
-
-function finishLogin(name, role, isOwner, accountId, hasAccount) {
-    saveOrClearLoginData(name);
+function finishLogin(name, role, isOwner, accountId, hasAccount, skipNotification) {
     if (typeof ME_USER !== 'undefined') {
         ME_USER.name = name;
         ME_USER.avatar = selectedLoginAvatar;
@@ -195,17 +228,17 @@ function finishLogin(name, role, isOwner, accountId, hasAccount) {
     }
     document.getElementById('loginScreen')?.classList.add('hidden');
     if (typeof renderOnlineUsers === 'function') renderOnlineUsers();
-    if (typeof showNotification === 'function') showNotification(`👋 أهلاً بك ${name}`, 'join');
+    if (typeof showNotification === 'function') showNotification(skipNotification ? `👋 مرحباً بعودتك ${name}` : `👋 أهلاً بك ${name}`, 'join');
 }
 
-function initLoginScreen() {
+async function initLoginScreen() {
     try {
         selectLoginAvatar(AVATAR_OPTIONS[0]);
         switchLoginTab('guest');
         renderAvatarGrid();
-        loadSavedLoginData();
         document.getElementById('customAvatarInput')?.addEventListener('change', (e) => handleCustomAvatarUpload(e.target.files[0]));
         document.getElementById('loginUsernameInput')?.addEventListener('input', updateRegisteredPasswordFields);
+        await tryAutoLogin();
     } catch (err) {
         console.error('فشل تهيئة شاشة الدخول (initLoginScreen):', err);
     }
