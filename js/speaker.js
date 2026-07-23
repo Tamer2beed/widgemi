@@ -86,14 +86,6 @@ function assignSpeaker(user, mode, seconds) {
     speakerState.mode = mode;
     speakerState.secondsLeft = seconds || 0;
 
-    if (typeof showNotification === 'function') {
-        if (user.id === ME_USER.id) {
-            showNotification(`🎙️ حصلت على السبيكر ${mode === 'open' ? '(وقت مفتوح)' : ''}`, 'join');
-        } else {
-            showNotification(`🎙️ ${user.name} يتحدث الآن عبر السبيكر`, 'join');
-        }
-    }
-
     if (mode === 'timed') {
         speakerState.timerId = setInterval(() => {
             speakerState.secondsLeft--;
@@ -106,9 +98,6 @@ function assignSpeaker(user, mode, seconds) {
 
 function releaseSpeaker() {
     clearSpeakerTimer();
-    if (speakerState.user && speakerState.user.id !== ME_USER.id && typeof showNotification === 'function') {
-        showNotification(`🔇 انتهى دور ${speakerState.user.name} في السبيكر`, 'leave');
-    }
     speakerState.user = null;
     speakerState.mode = null;
     speakerState.secondsLeft = 0;

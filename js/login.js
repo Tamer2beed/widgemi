@@ -1,4 +1,4 @@
-/* login.js — تسجيل الدخول: مطابقة الاسم بدون حساسية لحالة الأحرف، دخول تلقائي آمن (تشفير فقط، بدون نص صريح). */
+/* login.js — تسجيل الدخول: حفظ متعدد الحسابات (اسم + كلمة مرور مشفّرة + صورة) لكل عضو على حدة. */
 
 const AVATAR_PLACEHOLDER_COLORS = ['#9333ea','#2563eb','#16a34a','#dc2626','#ea580c','#0891b2','#db2777','#4f46e5','#65a30d','#0d9488'];
 function buildPlaceholderAvatar(color) {
@@ -64,29 +64,46 @@ function switchLoginTab(tab) {
     }
 }
 
-/* ---------- حفظ بيانات الدخول بأمان: يُخزَّن التجزئة (hash) فقط، لا كلمة المرور الصريحة أبداً ---------- */
+/* ---------- حفظ متعدد الحسابات: { "الاسم(بأحرف صغيرة)": {name, avatar, tab, roomHash, nameHash} } ---------- */
+function loadSavedAccountsMap() {
+    try { return JSON.parse(localStorage.getItem('savedLoginAccounts') || '{}'); } catch (e) { return {}; }
+}
+function saveSavedAccountsMap(map) {
+    try { localStorage.setItem('savedLoginAccounts', JSON.stringify(map)); } catch (e) {}
+}
+
 function saveLoginCredentials(name, roomHash, nameHash) {
     try {
         const remember = document.getElementById('rememberLoginCheckbox')?.checked;
-        if (!remember) { localStorage.removeItem('savedLoginData'); return; }
-        localStorage.setItem('savedLoginData', JSON.stringify({
-            tab: currentLoginTab, name, avatar: selectedLoginAvatar,
-            roomHash: roomHash || null, nameHash: nameHash || null
-        }));
+        const map = loadSavedAccountsMap();
+        const key = name.toLowerCase();
+        if (!remember) { delete map[key]; saveSavedAccountsMap(map); localStorage.setItem('lastLoginAccountKey', ''); return; }
+        map[key] = { name, avatar: selectedLoginAvatar, tab: currentLoginTab, roomHash: roomHash || null, nameHash: nameHash || null };
+        saveSavedAccountsMap(map);
+        localStorage.setItem('lastLoginAccountKey', key);
     } catch (e) {}
 }
 
-function clearSavedLoginCredentials() { try { localStorage.removeItem('savedLoginData'); } catch (e) {} }
+function clearSavedLoginCredentials(name) {
+    try {
+        const map = loadSavedAccountsMap();
+        delete map[name.toLowerCase()];
+        saveSavedAccountsMap(map);
+    } catch (e) {}
+}
 
 async function tryAutoLogin() {
-    let saved;
-    try { const s = localStorage.getItem('savedLoginData'); if (!s) return false; saved = JSON.parse(s); } catch (e) { return false; }
+    const map = loadSavedAccountsMap();
+    const lastKey = localStorage.getItem('lastLoginAccountKey');
+    const saved = lastKey ? map[lastKey] : null;
     if (!saved || !saved.name) return false;
 
     switchLoginTab(saved.tab || 'guest');
     const ui = document.getElementById('loginUsernameInput');
     if (ui) ui.value = saved.name;
     if (saved.avatar) selectLoginAvatar(saved.avatar);
+    const rememberBox = document.getElementById('rememberLoginCheckbox');
+    if (rememberBox) rememberBox.checked = true;
     updateRegisteredPasswordFields();
 
     if (saved.tab === 'guest') {
@@ -112,8 +129,50 @@ async function tryAutoLogin() {
             return true;
         }
     }
-    clearSavedLoginCredentials();
+    clearSavedLoginCredentials(saved.name);
     return false;
+}
+
+/* اختيار حساب محفوظ آخر من زر "حساباتي المحفوظة" */
+function renderSavedAccountsList() {
+    const listEl = document.getElementById('savedAccountsList');
+    if (!listEl) return;
+    const map = loadSavedAccountsMap();
+    const keys = Object.keys(map);
+    if (keys.length === 0) {
+        listEl.innerHTML = '<div class="text-center text-white/40 text-xs py-6">لا توجد حسابات محفوظة</div>';
+        return;
+    }
+    listEl.innerHTML = keys.map(key => {
+        const acc = map[key];
+        return `<button class="saved-account-item w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 mb-2" data-key="${key}">
+            <img src="${acc.avatar}" class="w-10 h-10 rounded-xl object-cover border-2 border-purple-400 shrink-0">
+            <span class="text-white text-sm font-bold flex-1 text-right">${acc.name}</span>
+            <button class="saved-account-remove text-red-400 text-xs px-2" data-key="${key}"><i class="fa-solid fa-trash-can"></i></button>
+        </button>`;
+    }).join('');
+}
+
+function openSavedAccountsModal() {
+    renderSavedAccountsList();
+    document.getElementById('savedAccountsModal')?.classList.remove('hidden');
+}
+
+function selectSavedAccount(key) {
+    const map = loadSavedAccountsMap();
+    const acc = map[key];
+    if (!acc) return;
+    localStorage.setItem('lastLoginAccountKey', key);
+    document.getElementById('savedAccountsModal')?.classList.add('hidden');
+    tryAutoLogin();
+}
+
+function removeSavedAccount(key) {
+    const map = loadSavedAccountsMap();
+    delete map[key];
+    saveSavedAccountsMap(map);
+    if (localStorage.getItem('lastLoginAccountKey') === key) localStorage.setItem('lastLoginAccountKey', '');
+    renderSavedAccountsList();
 }
 
 async function attemptLogin() {
@@ -140,6 +199,7 @@ async function attemptLogin() {
         if (!account || account.role === 'super_master') { if (typeof showNotification === 'function') showNotification('اسم المستخدم غير موجود — إذا كان "master" استخدم تبويب عضو مميز', 'leave'); return; }
         const hash = await hashPassword(pw);
         if (hash !== account.passwordHash) { if (typeof showNotification === 'function') showNotification('كلمة المرور غير صحيحة', 'leave'); return; }
+        if (typeof isCurrentDeviceBound === 'function' && !isCurrentDeviceBound(account)) { if (typeof showNotification === 'function') showNotification('⛔ هذا الحساب مربوط بأجهزة أخرى، لا يمكن الدخول من هذا الجهاز', 'leave'); return; }
         if (account.mustChangePassword) { openForcedSingleChange(account, name); return; }
         saveLoginCredentials(name, hash, null);
         finishLogin(name, account.role, account.role !== 'member', account.id, true);
@@ -155,6 +215,7 @@ async function attemptLogin() {
             const nameHash = await hashPassword(namePw);
             const roomHash = await hashPassword(roomPw);
             if (nameHash !== account.namePasswordHash || roomHash !== account.roomPasswordHash) { if (typeof showNotification === 'function') showNotification('بيانات الدخول غير صحيحة', 'leave'); return; }
+            if (typeof isCurrentDeviceBound === 'function' && !isCurrentDeviceBound(account)) { if (typeof showNotification === 'function') showNotification('⛔ هذا الحساب مربوط بأجهزة أخرى، لا يمكن الدخول من هذا الجهاز', 'leave'); return; }
             if (account.mustChangePassword) {
                 loggedInAccountId = account.id;
                 document.getElementById('forcedChangeSubtitle').textContent = `مرحباً ${name} — يجب تعيين كلمتي مرور جديدتين ومختلفتين قبل المتابعة`;

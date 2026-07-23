@@ -42,7 +42,7 @@
         #sideMenu .menu-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 10px; }
         #sideMenu .menu-header { color: rgba(255,255,255,0.3); font-size: 10px; padding: 6px 14px 2px; letter-spacing: 0.5px; font-weight: 500; }
 
-        #notification-area { position: fixed; bottom: 4.5rem; left: 50%; transform: translateX(-50%); z-index: 45; width: 90%; max-width: 400px; pointer-events: none; }
+        #notification-area { position: fixed; bottom: 4.5rem; left: 50%; transform: translateX(-50%); z-index: 999; width: 90%; max-width: 400px; pointer-events: none; }
         .notification-join, .notification-leave { animation: notifFadeIn 0.4s ease-out, notifFadeOut 0.5s ease-in 3s forwards; direction: rtl; text-align: center; margin: 0 auto; padding: 8px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .notification-join { background: rgba(22,163,74,0.9); color: #fff; }
         .notification-leave { background: rgba(239,68,68,0.9); color: #fff; }
@@ -67,10 +67,10 @@
         .mini-num-input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 8px; color: white; font-size: 14px; text-align: center; outline: none; width: 100%; }
         #memberContextModal { transition: background-color 0.3s ease; }
         #memberContextModal .member-context-panel {
-            background: rgba(25,20,35,0.78) !important;
-            backdrop-filter: blur(18px) !important; -webkit-backdrop-filter: blur(18px) !important;
-            border: 1px solid rgba(255,255,255,0.08) !important;
-            border-radius: 18px !important;
+            background: rgba(25,20,35,0.5) !important;
+            backdrop-filter: blur(14px) !important; -webkit-backdrop-filter: blur(14px) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important;
+            border-radius: 16px !important;
             transform: scale(0.95); opacity: 0;
             transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), opacity 0.18s ease;
         }
@@ -82,6 +82,17 @@
         .mention-highlight-flash { animation: mentionFlash 1.5s ease; }
         @keyframes mentionFlash { 0%,100% { background-color: transparent; } 25%,60% { background-color: rgba(147,51,234,0.18); } }
         #scrollToBottomBtn { position:fixed; left:1rem; bottom:5rem; z-index:35; width:42px; height:42px; border-radius:14px; background:#9333ea; color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.25); }
+        .reply-quote-block { display:block; border-right:3px solid #9333ea; background:rgba(147,51,234,0.08); border-radius:8px; padding:4px 8px; margin-bottom:6px; cursor:pointer; }
+        .reply-quote-sender { display:block; font-size:10px; font-weight:700; color:#9333ea; }
+        .reply-quote-text { display:block; font-size:11px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        #replyPreviewBar { border-right:3px solid #9333ea; }
+        #messageActionsModal .message-actions-panel {
+            background: rgba(25,20,35,0.5) !important; backdrop-filter: blur(14px) !important; -webkit-backdrop-filter: blur(14px) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 16px !important;
+            transform: scale(0.95); opacity: 0; transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), opacity 0.18s ease;
+        }
+        #messageActionsModal.panel-visible .message-actions-panel { transform: scale(1); opacity: 1; }
+    
     
         .super-master-glow { animation: superMasterPulse 1.8s ease-in-out infinite; }
         @keyframes superMasterPulse {
@@ -113,10 +124,13 @@
             <input id="loginNamePasswordInput" type="password" placeholder="كلمة المرور" class="hidden w-full bg-white/10 border border-white/15 rounded-xl p-3 text-white placeholder-white/40 outline-none mb-4">
             <input id="loginRoomPasswordInput" type="password" placeholder="كلمة مرور الغرفة" class="hidden w-full bg-white/10 border border-white/15 rounded-xl p-3 text-white placeholder-white/40 outline-none mb-4">
 
-            <label class="flex items-center gap-2 text-white/60 text-xs mb-4 cursor-pointer">
-                <input id="rememberLoginCheckbox" type="checkbox" class="w-4 h-4 accent-purple-500">
-                حفظ بيانات الدخول (الاسم فقط — كلمة المرور لا تُحفظ أبداً)
-            </label>
+            <div class="flex items-center justify-between mb-4">
+                <label class="flex items-center gap-2 text-white/60 text-xs cursor-pointer">
+                    <input id="rememberLoginCheckbox" type="checkbox" class="w-4 h-4 accent-purple-500">
+                    حفظ بيانات الدخول (مشفّرة بالكامل)
+                </label>
+                <button id="openSavedAccountsBtn" type="button" class="text-purple-300 text-xs underline">حساباتي المحفوظة</button>
+            </div>
             <div class="flex gap-3 mt-2">
                 <button id="loginCancelBtn" class="flex-1 bg-white/10 border border-white/15 text-white/70 rounded-xl p-3 text-sm">إلغاء</button>
                 <button id="loginSubmitBtn" class="flex-1 bg-purple-600 text-white rounded-xl p-3 text-sm font-bold">دخول</button>
@@ -152,7 +166,7 @@
 
     <div id="notification-area"></div>
 
-    <button id="scrollToBottomBtn" class="hidden"><i class="fa-solid fa-arrow-down"></i></button>
+    <button id="scrollToBottomBtn" class="hidden relative"><i class="fa-solid fa-arrow-down"></i><span id="scrollToBottomCount" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center border border-white"></span></button>
 
     <div id="footer-component"></div>
 
@@ -554,12 +568,35 @@
         window.addEventListener('error', (e) => showJsError('ERROR: ' + e.message + '\nFile: ' + e.filename + ':' + e.lineno));
         window.addEventListener('unhandledrejection', (e) => showJsError('PROMISE REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)));
     </script>
+    <div id="savedAccountsModal" class="hidden fixed inset-0 flex items-center justify-center z-[130] p-4" style="background:rgba(0,0,0,0.7);">
+        <div class="glass-menu w-full max-w-sm rounded-2xl p-5 max-h-[70vh] flex flex-col">
+            <div class="flex items-center justify-between mb-3 shrink-0">
+                <span class="text-white font-bold text-base">حساباتي المحفوظة</span>
+                <button id="closeSavedAccountsBtn" class="text-white/60 text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="savedAccountsList" class="space-y-2 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <div id="deviceBindModal" class="hidden fixed inset-0 flex items-center justify-center z-[85] p-4" style="background:rgba(0,0,0,0.65);">
+        <div class="glass-menu w-full max-w-sm rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-1">
+                <span id="deviceBindTitle" class="text-white font-bold text-base"></span>
+                <button id="closeDeviceBindBtn" class="text-white/60 text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-white/40 text-xs mb-3">الأجهزة المربوطة: <span id="deviceBindCount">0/3</span></p>
+            <div id="deviceBindList" class="mb-4"></div>
+            <button id="deviceBindAddCurrentBtn" class="hidden w-full bg-indigo-600 text-white rounded-xl p-3 text-sm font-bold"><i class="fa-solid fa-link ml-2"></i> ربط هذا الجهاز</button>
+        </div>
+    </div>
+
     <script src="js/crypto.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/sidebar.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/speaker.js"></script>
     <script src="js/logs.js"></script>
+    <script src="js/device-binding.js"></script>
     <script src="js/admins.js"></script>
     <script src="js/login.js"></script>
     <div id="forcedSinglePasswordChangeModal" class="hidden fixed inset-0 z-[120] flex items-center justify-center p-4" style="background:rgba(0,0,0,0.8);">
@@ -579,7 +616,7 @@
             </div>
 
             <div id="memberContextMainPanel" class="divide-y divide-white/5">
-                <button id="memberContextMentionBtn" class="w-full flex items-center py-3 text-white text-sm"><i class="fa-solid fa-at ml-2"></i> رسالة عامة</button>
+                <button id="memberContextMentionBtn" class="w-full flex items-center py-3 text-white text-sm"><i class="fa-solid fa-at ml-2"></i> ذكر</button>
                 <button id="memberContextClearMsgBtn" class="hidden w-full flex items-center py-3 text-white text-sm"><i class="fa-solid fa-eraser ml-2"></i> مسح النص</button>
                 <button id="memberContextClearMsgAllBtn" class="hidden w-full flex items-center py-3 text-white text-sm"><i class="fa-solid fa-broom ml-2"></i> مسح النص للجميع</button>
                 <button id="memberContextPrivateChatBtn" class="w-full flex items-center py-3 text-white text-sm"><i class="fa-solid fa-comment-dots ml-2"></i> محادثة خاصة</button>

@@ -4,13 +4,29 @@ let pmConversations = {};   // { userId: [ {from:'me'|'them', text, time} ] }
 let pmUnreadCounts = {};    // { userId: count }
 let currentPmUserId = null;
 
+let pmContactsInfo = {};
+
 function loadPmData() {
     try { pmConversations = JSON.parse(localStorage.getItem('pmConversations') || '{}'); } catch (e) { pmConversations = {}; }
     try { pmUnreadCounts = JSON.parse(localStorage.getItem('pmUnreadCounts') || '{}'); } catch (e) { pmUnreadCounts = {}; }
+    try { pmContactsInfo = JSON.parse(localStorage.getItem('pmContactsInfo') || '{}'); } catch (e) { pmContactsInfo = {}; }
 }
 function savePmData() {
     try { localStorage.setItem('pmConversations', JSON.stringify(pmConversations)); } catch (e) {}
     try { localStorage.setItem('pmUnreadCounts', JSON.stringify(pmUnreadCounts)); } catch (e) {}
+    try { localStorage.setItem('pmContactsInfo', JSON.stringify(pmContactsInfo)); } catch (e) {}
+}
+
+/* يعيد بيانات عرض جهة الاتصال (اسم/صورة) حتى لو غادر العضو الغرفة، معتمداً على آخر ما نعرفه عنه */
+function getPmContactDisplay(userId) {
+    const live = (typeof mockUsersList !== 'undefined') ? mockUsersList.find(u => String(u.id) === String(userId)) : null;
+    if (live) {
+        pmContactsInfo[userId] = { name: live.name, avatar: live.avatar };
+        savePmData();
+        return { name: live.name, avatar: live.avatar, online: true };
+    }
+    if (pmContactsInfo[userId]) return { name: pmContactsInfo[userId].name, avatar: pmContactsInfo[userId].avatar, online: false };
+    return { name: 'عضو غادر', avatar: (typeof ME_AVATAR !== 'undefined' ? ME_AVATAR : ''), online: false };
 }
 
 function getTotalUnreadPm() {
@@ -49,36 +65,88 @@ function renderPmList() {
         return (lb.ts || 0) - (la.ts || 0);
     });
     listEl.innerHTML = userIds.map(uid => {
-        const user = (typeof mockUsersList !== 'undefined') ? mockUsersList.find(u => String(u.id) === String(uid)) : null;
+        const info = getPmContactDisplay(uid);
         const last = pmConversations[uid][pmConversations[uid].length - 1];
         const unread = pmUnreadCounts[uid] || 0;
-        const name = user ? user.name : 'عضو غادر';
-        const avatar = user ? user.avatar : (typeof ME_AVATAR !== 'undefined' ? ME_AVATAR : '');
         return `
-        <button class="pm-open-conv-btn w-full flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 border border-gray-100 mb-2" data-user-id="${uid}">
-            <img src="${pmSafe(avatar)}" class="w-11 h-11 rounded-xl object-cover border-2 border-purple-200 shrink-0">
-            <div class="flex-1 text-right overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-gray-800 text-sm truncate">${pmSafe(name)}</span>
-                    ${unread > 0 ? `<span class="bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center shrink-0">${unread > 9 ? '9+' : unread}</span>` : ''}
-                </div>
-                <span class="text-gray-400 text-[11px] truncate block">${last.from === 'me' ? 'أنت: ' : ''}${pmSafe(last.text)}</span>
+        <div class="pm-swipe-wrapper relative overflow-hidden rounded-xl mb-2">
+            <div class="absolute inset-0 flex items-center justify-between px-4 text-white text-xs font-bold" style="background:linear-gradient(to left, #ef4444 50%, #f59e0b 50%);">
+                <span>حذف</span><span>غير مقروءة</span>
             </div>
-        </button>`;
+            <button class="pm-open-conv-btn relative w-full flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl" data-user-id="${uid}" style="touch-action: pan-y;">
+                <img src="${pmSafe(info.avatar)}" class="w-11 h-11 rounded-xl object-cover border-2 ${info.online ? 'border-purple-200' : 'border-gray-200 opacity-60'} shrink-0">
+                <div class="flex-1 text-right overflow-hidden">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-gray-800 text-sm truncate">${pmSafe(info.name)}</span>
+                        ${unread > 0 ? `<span class="bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center shrink-0">${unread > 9 ? '9+' : unread}</span>` : ''}
+                    </div>
+                    <span class="text-gray-400 text-[11px] truncate block">${last.from === 'me' ? 'أنت: ' : ''}${pmSafe(last.text)}</span>
+                </div>
+            </button>
+        </div>`;
     }).join('');
+    attachPmSwipeHandlers();
+}
+
+function attachPmSwipeHandlers() {
+    document.querySelectorAll('.pm-open-conv-btn').forEach(item => {
+        let startX = 0, currentX = 0, isSwiping = false, moved = false;
+        item.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX; currentX = startX; isSwiping = true; moved = false;
+            item.style.transition = 'none';
+        }, { passive: true });
+        item.addEventListener('touchmove', e => {
+            if (!isSwiping) return;
+            currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+            if (Math.abs(diff) > 8) moved = true;
+            item.style.transform = `translateX(${diff}px)`;
+        }, { passive: true });
+        item.addEventListener('touchend', () => {
+            if (!isSwiping) return;
+            isSwiping = false;
+            const diff = currentX - startX;
+            item.style.transition = 'transform 0.25s ease';
+            const uid = item.dataset.userId;
+            if (moved && diff < -70) {
+                item.style.transform = 'translateX(-100%)';
+                setTimeout(() => deletePmConversation(uid), 180);
+            } else if (moved && diff > 70) {
+                markPmConversationUnread(uid);
+                item.style.transform = 'translateX(0)';
+            } else {
+                item.style.transform = 'translateX(0)';
+            }
+        });
+    });
+}
+
+function deletePmConversation(userId) {
+    delete pmConversations[userId];
+    delete pmUnreadCounts[userId];
+    savePmData();
+    updatePmBadge();
+    renderPmList();
+    if (typeof showNotification === 'function') showNotification('🗑️ تم حذف المحادثة', 'leave');
+}
+
+function markPmConversationUnread(userId) {
+    pmUnreadCounts[userId] = Math.max(1, pmUnreadCounts[userId] || 0);
+    savePmData();
+    updatePmBadge();
+    renderPmList();
 }
 
 /* ---------- نافذة محادثة فردية ---------- */
 function openPmConversation(userId) {
-    const user = (typeof mockUsersList !== 'undefined') ? mockUsersList.find(u => String(u.id) === String(userId)) : null;
-    if (!user) { if (typeof showNotification === 'function') showNotification('هذا العضو غير متصل حالياً', 'leave'); return; }
+    const info = getPmContactDisplay(userId);
     currentPmUserId = String(userId);
     document.getElementById('pmListModal')?.classList.add('hidden');
 
     const nameEl = document.getElementById('pmConvName');
-    if (nameEl) nameEl.textContent = user.name;
+    if (nameEl) nameEl.textContent = info.name;
     const avatarEl = document.getElementById('pmConvAvatar');
-    if (avatarEl) avatarEl.src = user.avatar;
+    if (avatarEl) avatarEl.src = info.avatar;
 
     pmUnreadCounts[currentPmUserId] = 0;
     savePmData();

@@ -89,14 +89,15 @@ function renderAdminAccounts() {
         const canDemote = canAct && roleIdx > 0;
         return `
         <div class="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-2">
-            <div class="flex items-center justify-between">
+            <button class="admin-name-toggle w-full flex items-center justify-between" data-id="${a.id}">
                 <span class="font-bold text-sm" style="color:${color};">${admSafe(a.name)}${isProtected ? ' <i class=\"fa-solid fa-lock text-white/30 text-[10px]\"></i>' : ''}</span>
                 ${a.mustChangePassword ? '<span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">بانتظار تغيير كلمة المرور</span>' : ''}
-            </div>
+            </button>
             <div class="text-white/40 text-[11px]"><i class="fa-regular fa-calendar ml-1"></i>${new Date(a.createdAt).toLocaleDateString('ar-EG')}</div>
-            <div class="flex flex-wrap gap-2 pt-1">
+            <div id="admin-actions-${a.id}" class="hidden flex flex-wrap gap-2 pt-1">
                 ${canPromote ? `<button class="admin-acc-promote-btn text-[10px] px-2 py-1 rounded-lg bg-cyan-600/80 text-white" data-id="${a.id}">رفع مستوى</button>` : ''}
                 ${canDemote ? `<button class="admin-acc-demote-btn text-[10px] px-2 py-1 rounded-lg bg-amber-600/80 text-white" data-id="${a.id}">تخفيض</button>` : ''}
+                ${!isProtected ? `<button class="admin-acc-bind-btn text-[10px] px-2 py-1 rounded-lg bg-indigo-600/80 text-white" data-id="${a.id}">ربط الجهاز</button>` : ''}
                 ${canAct ? `<button class="admin-acc-changepw-btn text-[10px] px-2 py-1 rounded-lg bg-blue-600/80 text-white" data-id="${a.id}">تغيير كلمة المرور</button>` : ''}
                 ${canAct ? `<button class="admin-acc-delete-btn text-[10px] px-2 py-1 rounded-lg bg-red-600/80 text-white" data-id="${a.id}">حذف</button>` : ''}
             </div>

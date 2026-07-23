@@ -24,6 +24,8 @@ const mockPhrases = ["السلام عليكم ورحمة الله، مساكم �
 
 function sanitize(str) { return String(str).replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+let messageRegistry = {};
+
 function getUserSortPriority(userId, originalIndex) {
     try {
         if (typeof speakerState !== 'undefined' && speakerState.user && speakerState.user.id === userId) return -1;
@@ -75,12 +77,16 @@ function sendMockMessage(user) {
     const div = document.createElement('div');
     div.id = msgId;
     div.className = "flex items-start max-w-[85%] self-start gap-2";
-    div.innerHTML = `<div class="message-user-trigger w-9 h-9 rounded-xl bg-purple-500 overflow-hidden shadow-md border-2 border-white shrink-0 cursor-pointer" data-user-id="${user.id}"><img src="${sanitize(user.avatar)}" class="w-full h-full object-cover"></div><div class="bg-white rounded-2xl shadow-sm border border-purple-100 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs message-user-trigger cursor-pointer" data-user-id="${user.id}">${sanitize(user.name)}</span><span class="text-[9px] text-gray-400">${sanitize(time)}</span></div><p class="chat-msg-text leading-relaxed break-words" style="color:${sanitize(user.color)};">${bodyHtml}</p></div>`;
+    div.innerHTML = `<div class="message-user-trigger w-9 h-9 rounded-xl bg-purple-500 overflow-hidden shadow-md border-2 border-white shrink-0 cursor-pointer" data-user-id="${user.id}"><img src="${sanitize(user.avatar)}" class="w-full h-full object-cover"></div><div class="bg-white rounded-2xl shadow-sm border border-purple-100 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs message-user-trigger cursor-pointer" data-user-id="${user.id}">${sanitize(user.name)}</span><span class="text-[9px] text-gray-400">${sanitize(time)}</span></div><p class="chat-msg-text leading-relaxed break-words message-text-trigger cursor-pointer" data-msg-id="${msgId}" style="color:${sanitize(user.color)};">${bodyHtml}</p></div>`;
 
-    const wasNearBottom = (chatCont.scrollHeight - chatCont.scrollTop - chatCont.clientHeight) < 150;
+    const wasNearBottom = (chatCont.scrollHeight - chatCont.scrollTop - chatCont.clientHeight) < 40;
     msgList.appendChild(div);
     applyUserInterfaceSettings();
-    if (wasNearBottom) { chatCont.scrollTop = chatCont.scrollHeight; }
+    if (wasNearBottom) {
+        chatCont.scrollTop = chatCont.scrollHeight;
+    } else if (typeof unseenMessageCount !== 'undefined') {
+        unseenMessageCount++;
+    }
     if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility();
 }
 

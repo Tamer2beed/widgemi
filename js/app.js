@@ -1,6 +1,8 @@
 function sanitizeText(str) { return String(str).replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function showNotification(msg, type='join') {
+    const loginScreenEl = document.getElementById('loginScreen');
+    if (loginScreenEl && !loginScreenEl.classList.contains('hidden')) return;
     const area = document.getElementById('notification-area');
     if (!area) return;
     const el = document.createElement('div');
@@ -38,12 +40,23 @@ function formatMessageText(text, msgId) {
     return (typeof linkifyMentions === 'function') ? linkifyMentions(escaped, msgId) : escaped;
 }
 
+let unseenMessageCount = 0;
+
 function checkScrollToBottomVisibility() {
-    const cc = document.getElementById('chatContainer');
     const btn = document.getElementById('scrollToBottomBtn');
-    if (!cc || !btn) return;
-    const distanceFromBottom = cc.scrollHeight - cc.scrollTop - cc.clientHeight;
-    btn.classList.toggle('hidden', distanceFromBottom < 150);
+    if (!btn) return;
+    const badge = document.getElementById('scrollToBottomCount');
+    if (unseenMessageCount > 0) {
+        btn.classList.remove('hidden');
+        if (badge) badge.textContent = unseenMessageCount > 99 ? '99+' : unseenMessageCount;
+    } else {
+        btn.classList.add('hidden');
+    }
+}
+
+function resetUnseenMessages() {
+    unseenMessageCount = 0;
+    checkScrollToBottomVisibility();
 }
 
 function applyChatTheme(theme) {
@@ -88,10 +101,16 @@ async function initEventHandlers() {
         applyUserInterfaceSettings();
         initSidebarTouchEvents();
         applyChatTheme(localStorage.getItem('chatTheme') || 'dots');
-        document.getElementById('chatContainer')?.addEventListener('scroll', () => { if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility(); });
+        document.getElementById('chatContainer')?.addEventListener('scroll', () => {
+            const ccScroll = document.getElementById('chatContainer');
+            if (ccScroll && (ccScroll.scrollHeight - ccScroll.scrollTop - ccScroll.clientHeight) < 40) {
+                if (typeof resetUnseenMessages === 'function') resetUnseenMessages();
+            } else if (typeof checkScrollToBottomVisibility === 'function') { checkScrollToBottomVisibility(); }
+        });
         if (typeof initLoginLogs === 'function') initLoginLogs();
         if (typeof initAdminAccounts === 'function') await initAdminAccounts();
         if (typeof initLoginScreen === 'function') initLoginScreen();
+        if (typeof initPmSystem === 'function') initPmSystem();
         if (typeof renderRoomsScreen === 'function') renderRoomsScreen();
 
         const savedPM = localStorage.getItem('userPMPrivacy') || 'members_only';
@@ -118,6 +137,14 @@ async function initEventHandlers() {
                 if (sideMenu && !target.closest('#sideMenu') && !target.closest('#menuBtn')) sideMenu.classList.remove('active');
 
                 if (target.closest('#onlineUsersToggleBtn')) { toggleOnlinePanel(); return; }
+
+                if (target.closest('#pmToggleBtn')) { if (typeof openPmListModal === 'function') openPmListModal(); return; }
+                if (target.closest('#closePmListBtn')) { document.getElementById('pmListModal')?.classList.add('hidden'); return; }
+                const pmOpenBtn = target.closest('.pm-open-conv-btn');
+                if (pmOpenBtn && pmOpenBtn.dataset.userId) { openPmConversation(pmOpenBtn.dataset.userId); return; }
+                if (target.closest('#backFromPmConvBtn')) { backToPmList(); return; }
+                if (target.closest('#closePmConvBtn')) { closePmConversation(); return; }
+                if (target.closest('#pmConvSendBtn')) { sendPmMessage(); return; }
 
                 const msgUserTrigger = target.closest('.message-user-trigger');
                 if (msgUserTrigger && msgUserTrigger.dataset.userId) {
@@ -153,6 +180,7 @@ async function initEventHandlers() {
                 if (target.closest('#scrollToBottomBtn')) {
                     const cc2 = document.getElementById('chatContainer');
                     if (cc2) cc2.scrollTo({ top: cc2.scrollHeight, behavior: 'smooth' });
+                    if (typeof resetUnseenMessages === 'function') resetUnseenMessages();
                     return;
                 }
 
@@ -306,6 +334,14 @@ async function initEventHandlers() {
                 if (target.closest('#loginCancelBtn')) { const ui = document.getElementById('loginUsernameInput'); if (ui) ui.value = ''; return; }
                 if (target.closest('#loginSubmitBtn')) { await attemptLogin(); return; }
 
+                if (target.closest('#openSavedAccountsBtn')) { if (typeof openSavedAccountsModal === 'function') openSavedAccountsModal(); return; }
+                if (target.closest('#closeSavedAccountsBtn')) { document.getElementById('savedAccountsModal')?.classList.add('hidden'); return; }
+                if (target.id === 'savedAccountsModal') { document.getElementById('savedAccountsModal').classList.add('hidden'); return; }
+                const savedRemoveBtn = target.closest('.saved-account-remove');
+                if (savedRemoveBtn && savedRemoveBtn.dataset.key) { removeSavedAccount(savedRemoveBtn.dataset.key); return; }
+                const savedAccBtn = target.closest('.saved-account-item');
+                if (savedAccBtn && savedAccBtn.dataset.key) { selectSavedAccount(savedAccBtn.dataset.key); return; }
+
                 if (target.closest('#submitForcedChangeBtn')) { await submitForcedPasswordChange(); return; }
 
                 if (target.closest('#submitForcedSingleChangeBtn')) { await submitForcedSinglePasswordChange(); return; }
@@ -349,13 +385,34 @@ async function initEventHandlers() {
                 if (target.closest('#confirmMasterColorBtn')) { confirmMasterColor(); return; }
                 if (target.id === 'masterColorModal') { document.getElementById('masterColorModal').classList.add('hidden'); return; }
 
+                const adminNameToggle = target.closest('.admin-name-toggle');
+                if (adminNameToggle && adminNameToggle.dataset.id) {
+                    document.getElementById('admin-actions-' + adminNameToggle.dataset.id)?.classList.toggle('hidden');
+                    return;
+                }
                 const admPromoteBtn = target.closest('.admin-acc-promote-btn');
-                if (admPromoteBtn) { promoteAdminAccount(admPromoteBtn.dataset.id); return; }
+                if (admPromoteBtn) {
+                    openConfirmModal('ترقية المشرف', 'هل تريد رفع رتبة هذا الحساب؟', 'ترقية', 'bg-cyan-600', () => promoteAdminAccount(admPromoteBtn.dataset.id));
+                    return;
+                }
                 const admDemoteBtn = target.closest('.admin-acc-demote-btn');
                 if (admDemoteBtn) {
                     openConfirmModal('تخفيض المشرف', 'هل تريد تخفيض رتبة هذا المشرف؟', 'تخفيض', 'bg-amber-600', () => demoteAdminAccount(admDemoteBtn.dataset.id));
                     return;
                 }
+                const admBindBtn = target.closest('.admin-acc-bind-btn');
+                if (admBindBtn) { if (typeof openDeviceBindModal === 'function') openDeviceBindModal(admBindBtn.dataset.id); return; }
+                if (target.closest('#closeDeviceBindBtn')) { document.getElementById('deviceBindModal')?.classList.add('hidden'); return; }
+                if (target.id === 'deviceBindModal') { document.getElementById('deviceBindModal').classList.add('hidden'); return; }
+                if (target.closest('#deviceBindAddCurrentBtn')) {
+                    const accId = target.closest('#deviceBindAddCurrentBtn').dataset.accountId;
+                    if (typeof bindCurrentDeviceToAccount === 'function') bindCurrentDeviceToAccount(accId);
+                    if (typeof openDeviceBindModal === 'function') openDeviceBindModal(accId);
+                    return;
+                }
+                const deviceUnbindBtn = target.closest('.device-unbind-btn');
+                if (deviceUnbindBtn) { unbindDeviceFromAccount(deviceUnbindBtn.dataset.accountId, deviceUnbindBtn.dataset.fp); return; }
+
                 const admDeleteBtn = target.closest('.admin-acc-delete-btn');
                 if (admDeleteBtn) {
                     openConfirmModal('حذف المشرف', 'سيتم حذف هذا المشرف نهائياً من القائمة.', 'حذف', 'bg-red-600', () => deleteAdminAccount(admDeleteBtn.dataset.id));
@@ -446,12 +503,15 @@ async function initEventHandlers() {
             const msgId = 'msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
             const formatted = formatMessageText(text, msgId);
             const myName = (typeof ME_USER !== 'undefined') ? ME_USER.name : 'أنا';
+            if (typeof messageRegistry !== 'undefined') messageRegistry[msgId] = { sender: myName, text: text };
+            const quoteHtml = (typeof buildReplyQuoteHtml === 'function') ? buildReplyQuoteHtml() : '';
             const div = document.createElement('div');
             div.id = msgId;
             div.className = "flex items-start max-w-[85%] self-start gap-2";
-            div.innerHTML = `<div class="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center text-white shadow-md border-2 border-white shrink-0"><i class="fa-solid fa-user text-sm"></i></div><div class="bg-purple-100 rounded-2xl shadow-sm border border-purple-200 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs mentionable-name" data-name="${sanitizeText(myName)}">${sanitizeText(myName)}</span><span class="text-[9px] text-purple-400">${sanitizeText(now)}</span></div><div class="chat-msg-text leading-relaxed break-words" style="color:${sanitizeText(globalFontColor)};">${formatted}</div></div>`;
+            div.innerHTML = `<div class="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center text-white shadow-md border-2 border-white shrink-0"><i class="fa-solid fa-user text-sm"></i></div><div class="bg-purple-100 rounded-2xl shadow-sm border border-purple-200 p-3 w-full"><div class="flex justify-between items-center mb-1 gap-4"><span class="font-bold text-purple-900 text-xs message-user-trigger cursor-pointer" data-user-id="me">${sanitizeText(myName)}</span><span class="text-[9px] text-purple-400">${sanitizeText(now)}</span></div>${quoteHtml}<div class="chat-msg-text leading-relaxed break-words message-text-trigger cursor-pointer" data-msg-id="${msgId}" style="color:${sanitizeText(globalFontColor)};">${formatted}</div></div>`;
             document.getElementById('messagesList')?.appendChild(div);
             chatInput.value = '';
+            if (typeof cancelReply === 'function') cancelReply();
             applyUserInterfaceSettings();
             const cc = document.getElementById('chatContainer');
             if (cc) cc.scrollTop = cc.scrollHeight;
@@ -459,6 +519,7 @@ async function initEventHandlers() {
         }
         sendBtn?.addEventListener('click', sendMessage);
         chatInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
+        document.getElementById('pmConvInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendPmMessage(); } });
 
         startSimulation();
 
