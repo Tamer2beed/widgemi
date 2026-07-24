@@ -27,15 +27,8 @@ function selectLoginAvatar(src) {
     renderAvatarGrid();
 }
 
-function handleCustomAvatarUpload(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        selectLoginAvatar(e.target.result);
-        document.getElementById('avatarPickerModal')?.classList.add('hidden');
-    };
-    reader.readAsDataURL(file);
-}
+/* [PHASE 1] handleCustomAvatarUpload() حُذفت — كانت تسمح برفع صورة حرة
+   عبر FileReader، والسيرفر الحقيقي ما يدعم هذا (16 أفاتار جاهزة فقط). */
 
 function updateRegisteredPasswordFields() {
     if (currentLoginTab !== 'registered') return;
@@ -297,7 +290,7 @@ async function initLoginScreen() {
         selectLoginAvatar(AVATAR_OPTIONS[0]);
         switchLoginTab('guest');
         renderAvatarGrid();
-        document.getElementById('customAvatarInput')?.addEventListener('change', (e) => handleCustomAvatarUpload(e.target.files[0]));
+        // [PHASE 1] عنصر customAvatarInput أُزيل من index.html — رفع صور حر غير مدعوم بالسيرفر الحقيقي.
         document.getElementById('loginUsernameInput')?.addEventListener('input', updateRegisteredPasswordFields);
         await tryAutoLogin();
     } catch (err) {
