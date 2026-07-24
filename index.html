@@ -593,6 +593,11 @@
     <script src="js/settings.js"></script>
     <script src="js/sidebar.js"></script>
     <script src="js/chat.js"></script>
+    <!-- [PHASE 2] الاتصال الحقيقي بسيرفر WidBid — يتطلب تشغيل هذي الصفحة
+         من نفس سيرفر WidBid نفسه (public/) عشان socket.io يلقى نقطة
+         الاتصال تلقائياً، مو من مستودع widgemi كملفات مستقلة. -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/socket-bridge.js"></script>
     <script src="js/speaker.js"></script>
     <script src="js/logs.js"></script>
     <script src="js/device-binding.js"></script>
