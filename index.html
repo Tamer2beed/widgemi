@@ -145,10 +145,9 @@
                 <button id="closeAvatarPickerBtn" class="text-white/60 text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="avatarGrid" class="grid grid-cols-5 gap-3 mb-4"></div>
-            <label class="w-full flex items-center justify-center gap-2 bg-white/5 border border-dashed border-white/20 rounded-xl p-3 text-white/70 text-sm cursor-pointer">
-                <i class="fa-solid fa-cloud-arrow-up"></i> تحميل صورة مخصصة
-                <input id="customAvatarInput" type="file" accept="image/*" class="hidden">
-            </label>
+            <!-- [PHASE 1] خيار "تحميل صورة مخصصة" أُزيل — السيرفر الحقيقي (WidBid)
+                 يدعم بس 16 أفاتار جاهزة من public/avatars/av1.svg → av16.svg،
+                 ما فيه endpoint لرفع صور حرة حالياً. -->
         </div>
     </div>
     <div id="header-component"></div>
