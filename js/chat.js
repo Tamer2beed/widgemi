@@ -8,13 +8,11 @@ const ME_USER = {
     isOwner: false, color: '#9333ea'
 };
 
+/* [PHASE 1] القائمة كانت مليانة مستخدمين وهميين (صور Unsplash، أسماء عشوائية).
+   الآن فاضية إلا من المستخدم الحالي — ستُملأ لاحقاً ببيانات حقيقية من
+   حدث Socket.io المسمّى 'onlineUsers' وقت الربط الفعلي بالسيرفر. */
 let mockUsersList = [
-    ME_USER,
-    { id:1, name:"عباصم", avatar:"https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150", status:"لدار للمرة يسكنها الا اللتي كان قبل لموت بانيها", isOwner:true, color:memberColors[0] },
-    { id:2, name:"o0 ما مرتاح 0o", avatar:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150", status:"مرحب بالجميع", isOwner:false, color:memberColors[1] },
-    { id:3, name:"BeNt H!tLeR", avatar:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150", status:"ابتسم للحياة", isOwner:true, color:memberColors[2] },
-    { id:4, name:"RoSe PaIris", avatar:"https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150", status:"خلي بينك وبين الناس مسافه لأن فجأه بع...", isOwner:true, color:memberColors[3] },
-    { id:5, name:"Ace", avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150", status:"بعينيها .. تقلب موازين الثبات .", isOwner:true, color:memberColors[4] }
+    ME_USER
 ];
 
 const newNamesPool = ["المهندس أحمد","نجمة طرابلس","الصقر الليبي","بنغازي العز","صقر الجنوب","ريما","عابر سبيل"];
@@ -64,6 +62,10 @@ function renderOnlineUsers() {
     });
 }
 
+/* [PHASE 1] هذي الدالة صارت خاملة (ما فيه شي يستدعيها عشوائياً بعد الآن)،
+   لكن منطق رسمها بالـ DOM سليم ومفيد — تُستخدم كمرجع جاهز عند الربط الحقيقي:
+   خُد نفس منطق بناء الفقاعة هنا، واستبدل `mockPhrases[...]` ببيانات الرسالة
+   الحقيقية القادمة من حدث socket.on('sendMessage', ...). */
 function sendMockMessage(user) {
     if (typeof isUserIgnored === 'function' && isUserIgnored(user.id)) return;
     const msgList = document.getElementById('messagesList');
@@ -90,48 +92,24 @@ function sendMockMessage(user) {
     if (typeof checkScrollToBottomVisibility === 'function') checkScrollToBottomVisibility();
 }
 
+/* [PHASE 1 — STUB] كانت تضيف مستخدم وهمي عشوائي كل 15 ثانية.
+   الدخول الحقيقي للمستخدمين يصل الآن عبر حدث Socket.io الحقيقي — لا حاجة
+   لهذي الدالة، أُبقيت فارغة بنفس التوقيع لعدم كسر أي استدعاء قديم لها. */
 function simulateUserJoin() {
-    if (mockUsersList.length >= 9) return;
-    const name = newNamesPool[Math.floor(Math.random() * newNamesPool.length)];
-    if (mockUsersList.some(u => u.name === name)) return;
-    const newUser = { id:Date.now(), name, avatar:newAvatarsPool[Math.floor(Math.random()*newAvatarsPool.length)], status:newStatusesPool[Math.floor(Math.random()*newStatusesPool.length)], isOwner:false, color:memberColors[Math.floor(Math.random()*memberColors.length)] };
-    mockUsersList.push(newUser);
-    if (typeof recordLogin === 'function') recordLogin(newUser);
-    renderOnlineUsers();
-    setTimeout(() => sendMockMessage(newUser), 1000);
+    // TODO(ربط حقيقي): يُستبدل بمستمع socket.on('userJoined', ...) بدل الاستدعاء اليدوي.
 }
 
+/* [PHASE 1 — STUB] كانت تطرد مستخدم وهمي عشوائي كل 25 ثانية.
+   الخروج الحقيقي يصل عبر Socket.io الحقيقي. أُبقيت فارغة بنفس التوقيع. */
 function simulateUserLeave() {
-    const normal = mockUsersList.filter(u => !u.isOwner && u.id !== 'me');
-    if (mockUsersList.length <= 3 || !normal.length) return;
-    const target = normal[Math.floor(Math.random() * normal.length)];
-    mockUsersList = mockUsersList.filter(u => u.id !== target.id);
-
-    try {
-        if (typeof speakerState !== 'undefined' && speakerState.user && speakerState.user.id === target.id && typeof releaseSpeaker === 'function') {
-            releaseSpeaker();
-        } else if (typeof micQueue !== 'undefined') {
-            const idx = micQueue.findIndex(q => q.id === target.id);
-            if (idx > -1) micQueue.splice(idx, 1);
-        }
-    } catch (err) { console.error('تنظيف حالة السبيكر عند المغادرة فشل:', err); }
-
-    if (typeof recordLogout === 'function') recordLogout(target.id);
-    renderOnlineUsers();
+    // TODO(ربط حقيقي): يُستبدل بمستمع socket.on('userLeft', ...) بدل الاستدعاء اليدوي.
 }
 
+/* [PHASE 1] كانت تشغّل 3 مؤقتات دائمة (رسائل عشوائية كل 6 ثواني + دخول/خروج
+   وهمي). أُبقيت فقط على الرسم الأولي — الربط الحقيقي لاحقاً سيستبدل هذي
+   الدالة بالكامل بمستمعات Socket.io حقيقية (onlineUsers, sendMessage...). */
 function startSimulation() {
     renderOnlineUsers();
-    (function loop() {
-        setTimeout(() => {
-            const bots = mockUsersList.filter(u => u.id !== 'me');
-            if (bots.length > 0) {
-                const u = bots[Math.floor(Math.random() * bots.length)];
-                sendMockMessage(u);
-            }
-            loop();
-        }, 6000);
-    })();
-    setInterval(simulateUserJoin, 15000);
-    setInterval(simulateUserLeave, 25000);
+    // TODO(ربط حقيقي): socket.on('onlineUsers', users => { mockUsersList = users; renderOnlineUsers(); })
+    // TODO(ربط حقيقي): socket.on('sendMessage', msg => { /* استخدم منطق sendMockMessage كمرجع للعرض */ })
 }
