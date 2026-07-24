@@ -13,6 +13,11 @@ let promoteSelectedRole = null;
 let pendingConfirmAction = null;
 let tempBanTargetLogId = null;
 
+/* [PHASE 1] هذي دوال توليد بيانات مؤقتة (placeholder) فقط للعرض البصري —
+   السيرفر الحقيقي (WidBid) عنده IP وبصمة جهاز حقيقيين لكل مستخدم
+   (last_login_ip, last_login_mac بجدول users + جداول ip_bans/device_bans).
+   عند الربط الحقيقي: مرّر هذي القيم كاملة من بيانات تسجيل الدخول الحقيقية
+   بدل توليدها عشوائياً هنا. */
 function randomIp() {
     return `${Math.floor(Math.random()*223)+1}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
 }
