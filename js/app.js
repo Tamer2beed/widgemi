@@ -499,6 +499,17 @@ async function initEventHandlers() {
             if (!chatInput) return;
             const text = chatInput.value.trim();
             if (!text) return;
+
+            /* [PHASE 2] لو فيه اتصال حقيقي بالسيرفر، نرسل عبره ونخلي السيرفر
+               هو اللي يرجّع الرسالة للجميع (بمن فيهم أنا) عبر newMessage —
+               بدل الرسم المحلي الفوري القديم (تجربة/عرض بدون سيرفر). */
+            if (typeof wbSocket !== 'undefined' && wbSocket && wbSocket.connected) {
+                wbSendMessage(text);
+                chatInput.value = '';
+                if (typeof cancelReply === 'function') cancelReply();
+                return;
+            }
+
             const now = new Date().toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
             const msgId = 'msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
             const formatted = formatMessageText(text, msgId);
