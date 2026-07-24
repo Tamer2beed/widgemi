@@ -3,8 +3,12 @@ import json
 import requests
 import shutil
 
-# مفتاح الـ API الخاص بك
-API_KEY = "AQ.Ab8RN6KECS3ZIRSJVpZPoMEW59myk7_-SurY2q0Drq8_c_-Ryg"
+# [SECURITY FIX] المفتاح كان مكتوب صراحة هنا — تم كشفه بمستودع عام وله خطر حقيقي.
+# يجب إلغاء المفتاح القديم من Google AI Studio فوراً وإنشاء مفتاح جديد.
+# المفتاح الجديد يُقرأ الآن من متغير بيئة GEMINI_API_KEY فقط — لا يُكتب بالكود إطلاقاً.
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
+if not API_KEY:
+    raise SystemExit("❌ GEMINI_API_KEY غير مضبوط. شغّل: export GEMINI_API_KEY=مفتاحك_الجديد")
 
 def read_all_files(path):
     project_content = ""
