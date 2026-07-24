@@ -142,17 +142,11 @@ function getUserMicBadgeHtml(userId) {
     return '';
 }
 
+/* [PHASE 1 — STUB] كانت تطلب مايك عشوائي كل 18 ثانية من مستخدم وهمي.
+   طلبات المايك الحقيقية تصل عبر Socket.io (حدث speakerRequest بالسيرفر
+   الحقيقي). أُبقيت فارغة بنفس التوقيع لعدم كسر أي استدعاء قديم. */
 function simulateMicRequest() {
-    if (typeof mockUsersList === 'undefined' || mockUsersList.length === 0) return;
-    if (Math.random() > 0.4) return;
-    const candidates = mockUsersList.filter(u =>
-        u.id !== 'me' &&
-        !(speakerState.user && speakerState.user.id === u.id) &&
-        !micQueue.some(q => q.id === u.id)
-    );
-    if (candidates.length === 0) return;
-    const u = candidates[Math.floor(Math.random() * candidates.length)];
-    requestMic(u);
+    // TODO(ربط حقيقي): يُستبدل بمستمع socket.on('speakerState', ...) بدل الاستدعاء اليدوي.
 }
 
 function toggleSpeakerAdminMenu() {
@@ -198,7 +192,7 @@ function initSpeakerFeature() {
             }
         });
 
-        setInterval(simulateMicRequest, 18000);
+        // [PHASE 1] أُزيل setInterval(simulateMicRequest, 18000) — الدالة صارت خاملة.
     } catch (err) {
         console.error('فشل تهيئة ميزة السبيكر (initSpeakerFeature):', err);
     }
